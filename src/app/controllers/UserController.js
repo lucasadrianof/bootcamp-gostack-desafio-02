@@ -31,6 +31,47 @@ class UserController {
       email,
     });
   }
+
+  async update(req, res) {
+    const schema = Yup.object().shape({
+      name: Yup.string(),
+      email: Yup.string().email(),
+      oldPassword: Yup.string(),
+      password: Yup.string().when('oldPassword', (oldPassword, field) =>
+        oldPassword ? field.required() : field
+      ),
+      passwordConfirmation: Yup.string().when('password', (password, field) =>
+        password ? field.required().oneOf([Yup.ref('password')]) : field
+      ),
+    });
+
+    if (!(await schema.isValid(req.body))) {
+      return res.status(400).json({ error: 'Bad payload' });
+    }
+
+    const { email, oldPassword } = req.body;
+    const user = await User.findByPk(req.userId);
+
+    if (email && email !== user.email) {
+      if (await User.findOne({ where: { email } })) {
+        return res.status(400).json({ error: 'User already exists ' });
+      }
+    }
+
+    if (oldPassword) {
+      if (!(await user.checkPassword(oldPassword))) {
+        return res.status(400).json({ error: 'Incorrect password' });
+      }
+    }
+
+    const { id, name } = await user.update(req.body);
+
+    return res.json({
+      id,
+      name,
+      email,
+    });
+  }
 }
 
 export default new UserController();
